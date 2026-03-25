@@ -22,12 +22,17 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 st.set_page_config(page_title="AI Notes Generator", layout="centered")
 
 st.title("📚 AI Notes Generator")
-st.markdown("Convert text, PDFs, or YouTube videos into structured notes 🚀")
+st.markdown("Convert text, PDFs, or YouTube videos into notes or questions 🚀")
 
 # -------------------------------
 # INPUT TYPE
 # -------------------------------
 option = st.radio("Choose input type:", ["Text", "PDF", "YouTube"])
+
+# -------------------------------
+# OUTPUT MODE
+# -------------------------------
+mode = st.radio("Select Output Type:", ["Notes", "Questions"])
 
 text_data = ""
 
@@ -38,7 +43,7 @@ if option == "Text":
     text_data = st.text_area("Enter your text here:")
 
 # -------------------------------
-# PDF INPUT (OCR FIXED)
+# PDF INPUT (OCR)
 # -------------------------------
 elif option == "PDF":
     uploaded_file = st.file_uploader("Upload PDF", type="pdf")
@@ -47,7 +52,6 @@ elif option == "PDF":
         reader = PdfReader(uploaded_file)
         text_list = []
 
-        # Normal extraction
         for page in reader.pages:
             content = page.extract_text()
             if content:
@@ -71,7 +75,7 @@ elif option == "PDF":
             st.error("❌ Could not extract text from this PDF")
 
 # -------------------------------
-# YOUTUBE INPUT (FIXED + CLEAN)
+# YOUTUBE INPUT
 # -------------------------------
 elif option == "YouTube":
 
@@ -101,10 +105,8 @@ elif option == "YouTube":
                     sub_url = subs[0]['url']
                     response = requests.get(sub_url)
 
-                    # CLEAN TEXT (remove XML tags)
-                    data = response.text
-                    clean_text = re.sub('<.*?>', '', data)
-
+                    # CLEAN XML TAGS
+                    clean_text = re.sub('<.*?>', '', response.text)
                     return clean_text
 
         except Exception as e:
@@ -116,7 +118,7 @@ elif option == "YouTube":
 
         if not text_data.strip():
             st.error("❌ No captions available for this video")
-            st.info("👉 Try another video (educational videos work best)")
+            st.info("👉 Try another video")
 
 # -------------------------------
 # CHUNKING
@@ -125,28 +127,39 @@ def chunk_text(text, size=2000):
     return [text[i:i+size] for i in range(0, len(text), size)]
 
 # -------------------------------
-# LLM CALL
+# LLM FUNCTION
 # -------------------------------
-def generate_notes(text):
+def generate_output(text, mode):
     chunks = chunk_text(text)
     final_output = ""
 
     progress = st.progress(0)
 
     for i, chunk in enumerate(chunks):
-        prompt = f"""
-        Summarize into structured notes:
 
-        - Summary
-        - Key Points
-        - Important Concepts
-        - 3 Questions with Answers
+        if mode == "Notes":
+            prompt = f"""
+            Summarize into structured notes:
 
-        Keep it short and clear.
+            - Summary
+            - Key Points
+            - Important Concepts
 
-        Text:
-        {chunk}
-        """
+            Keep it short and clear.
+
+            Text:
+            {chunk}
+            """
+
+        elif mode == "Questions":
+            prompt = f"""
+            Generate 5 important questions with answers from the text.
+
+            Make them useful for revision.
+
+            Text:
+            {chunk}
+            """
 
         try:
             res = requests.post(
@@ -175,19 +188,19 @@ def generate_notes(text):
 # -------------------------------
 # BUTTON
 # -------------------------------
-if st.button("Generate Notes"):
+if st.button("Generate"):
     if not text_data.strip():
         st.warning("Please provide input")
     else:
-        with st.spinner("Generating notes..."):
-            output = generate_notes(text_data)
+        with st.spinner("Generating..."):
+            output = generate_output(text_data, mode)
 
-        st.subheader("📌 Generated Notes")
+        st.subheader("📌 Output")
         st.write(output)
 
         st.download_button(
-            label="Download Notes",
+            label="Download Output",
             data=output,
-            file_name="notes.txt",
+            file_name="output.txt",
             mime="text/plain"
         )
